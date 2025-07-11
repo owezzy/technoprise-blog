@@ -1,5 +1,5 @@
 import { Component, ViewEncapsulation, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, AsyncPipe } from '@angular/common';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FuseAlertComponent } from '@fuse/components/alert';
 import { BlogSearchService } from './blog-search.service';
-import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
+import { BehaviorSubject, Subject, Observable, combineLatest, map, switchMap, takeUntil, debounceTime, distinctUntilChanged, startWith } from 'rxjs';
 import {environment} from "../../../environments/environment";
 
 interface BlogPost {
@@ -46,6 +46,7 @@ interface BlogResponse {
     standalone   : true,
     imports: [
         CommonModule,
+        AsyncPipe,
         RouterLink,
         MatProgressSpinnerModule,
         MatButtonModule,
@@ -58,27 +59,54 @@ interface BlogResponse {
 })
 export class BlogComponent implements OnInit, OnDestroy
 {
-    posts: BlogPost[] = [];
-    loading = true;
-    error: string | null = null;
+    // BehaviorSubjects for state management
+    private _posts$ = new BehaviorSubject<BlogPost[]>([]);
+    private _loading$ = new BehaviorSubject<boolean>(true);
+    private _error$ = new BehaviorSubject<string | null>(null);
+    private _currentPage$ = new BehaviorSubject<number>(1);
+    private _pageSize$ = new BehaviorSubject<number>(9);
+    private _totalRecords$ = new BehaviorSubject<number>(0);
+    private _totalPages$ = new BehaviorSubject<number>(0);
+    private _searchQuery$ = new BehaviorSubject<string>('');
     
-    // Pagination
-    currentPage = 1;
-    pageSize = 9;
-    totalRecords = 0;
-    totalPages = 0;
-    pageSizeOptions = [6, 9, 12, 18];
+    // Reactive streams for template consumption
+    posts$ = this._posts$.asObservable();
+    loading$ = this._loading$.asObservable();
+    error$ = this._error$.asObservable();
+    currentPage$ = this._currentPage$.asObservable();
+    pageSize$ = this._pageSize$.asObservable();
+    totalRecords$ = this._totalRecords$.asObservable();
+    totalPages$ = this._totalPages$.asObservable();
+    searchQuery$ = this._searchQuery$.asObservable();
     
-    // Getter for showing the paginator
-    get showPaginator(): boolean {
-        return !this.loading && (this.totalRecords > 0 || this.posts.length > 0);
-    }
+    // Derived streams
+    showPaginator$ = combineLatest([this.loading$, this.totalRecords$, this.posts$]).pipe(
+        map(([loading, totalRecords, posts]) => !loading && (totalRecords > 0 || posts.length > 0))
+    );
     
-    // Search
-    searchQuery = '';
+    currentPageIndex$ = this.currentPage$.pipe(map(page => page - 1));
     
-    // Make Math available in template
-    Math = Math;
+    gridClasses$ = this.pageSize$.pipe(
+        map(pageSize => {
+            const baseClasses = 'grid gap-8 blog-grid-transition';
+            switch (pageSize) {
+                case 6:
+                    return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
+                case 9:
+                    return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
+                case 12:
+                    return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`;
+                case 18:
+                    return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6`;
+                default:
+                    return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
+            }
+        })
+    );
+    
+    // Constants
+    readonly pageSizeOptions = [6, 9, 12, 18];
+    readonly Math = Math;
     
     /**
      * Getter for current year
@@ -106,21 +134,22 @@ export class BlogComponent implements OnInit, OnDestroy
      */
     ngOnInit(): void
     {
-        // Subscribe to route query parameters
+        // Set search as active for this page
+        this.blogSearchService.setSearchActive(true);
+        
+        // Handle route parameter changes
         this.route.queryParams
             .pipe(takeUntil(this._unsubscribeAll))
             .subscribe(params => {
-                this.currentPage = parseInt(params['page']) || 1;
-                this.pageSize = parseInt(params['pageSize']) || 9;
-                this.searchQuery = params['search'] || '';
+                this._currentPage$.next(parseInt(params['page']) || 1);
+                this._pageSize$.next(parseInt(params['pageSize']) || 9);
+                this._searchQuery$.next(params['search'] || '');
                 
                 // Update search service with current search query
-                this.blogSearchService.setSearchQuery(this.searchQuery);
-                
-                this.loadPosts();
+                this.blogSearchService.setSearchQuery(params['search'] || '');
             });
 
-        // Subscribe to search query changes from the search service
+        // Handle search query changes from the search service
         this.blogSearchService.searchQuery$
             .pipe(
                 takeUntil(this._unsubscribeAll),
@@ -128,15 +157,50 @@ export class BlogComponent implements OnInit, OnDestroy
                 distinctUntilChanged()
             )
             .subscribe(query => {
-                if (query !== this.searchQuery) {
-                    this.searchQuery = query;
-                    this.currentPage = 1;
+                if (query !== this._searchQuery$.value) {
+                    this._searchQuery$.next(query);
+                    this._currentPage$.next(1);
                     this.updateUrl();
                 }
             });
 
-        // Set search as active for this page
-        this.blogSearchService.setSearchActive(true);
+        // Load posts reactively based on state changes
+        combineLatest([
+            this._currentPage$,
+            this._pageSize$,
+            this._searchQuery$
+        ]).pipe(
+            takeUntil(this._unsubscribeAll),
+            debounceTime(100),
+            switchMap(([currentPage, pageSize, searchQuery]) => {
+                this._loading$.next(true);
+                this._error$.next(null);
+                
+                const params = new URLSearchParams({
+                    page: currentPage.toString(),
+                    page_size: pageSize.toString(),
+                    sort: '-published_at'
+                });
+
+                if (searchQuery.trim()) {
+                    params.append('title', searchQuery.trim());
+                }
+
+                return this.http.get<BlogResponse>(`${environment.BASE_URL}/posts?${params}`);
+            })
+        ).subscribe({
+            next: (response) => {
+                this._posts$.next(response.posts || []);
+                this._totalRecords$.next(response.metadata.total_records);
+                this._totalPages$.next(response.metadata.last_page);
+                this._loading$.next(false);
+            },
+            error: (err) => {
+                this._error$.next('Failed to load blog posts. Please try again later.');
+                this._loading$.next(false);
+                console.error('Error loading posts:', err);
+            }
+        });
     }
 
     /**
@@ -152,39 +216,6 @@ export class BlogComponent implements OnInit, OnDestroy
         this._unsubscribeAll.complete();
     }
 
-    /**
-     * Load posts from API
-     */
-    loadPosts(): void
-    {
-        this.loading = true;
-        this.error = null;
-
-        const params = new URLSearchParams({
-            page: this.currentPage.toString(),
-            page_size: this.pageSize.toString(),
-            sort: '-published_at'
-        });
-
-        if (this.searchQuery.trim()) {
-            params.append('title', this.searchQuery.trim());
-        }
-
-        this.http.get<BlogResponse>(`${environment.BASE_URL}/posts?${params}`)
-            .subscribe({
-                next: (response) => {
-                    this.posts = response.posts || [];
-                    this.totalRecords = response.metadata.total_records;
-                    this.totalPages = response.metadata.last_page;
-                    this.loading = false;
-                },
-                error: (err) => {
-                    this.error = 'Failed to load blog posts. Please try again later.';
-                    this.loading = false;
-                    console.error('Error loading posts:', err);
-                }
-            });
-    }
 
     /**
      * Get image URL
@@ -231,7 +262,7 @@ export class BlogComponent implements OnInit, OnDestroy
      */
     clearError(): void
     {
-        this.error = null;
+        this._error$.next(null);
     }
 
     /**
@@ -243,44 +274,14 @@ export class BlogComponent implements OnInit, OnDestroy
         const newPageSize = event.pageSize;
         
         // Update page size if changed
-        if (newPageSize !== this.pageSize) {
-            this.pageSize = newPageSize;
-            this.currentPage = 1; // Reset to first page when changing page size
+        if (newPageSize !== this._pageSize$.value) {
+            this._pageSize$.next(newPageSize);
+            this._currentPage$.next(1); // Reset to first page when changing page size
         } else {
-            this.currentPage = newPage;
+            this._currentPage$.next(newPage);
         }
         
         this.updateUrl();
-        // Reload data immediately to reflect changes
-        this.loadPosts();
-    }
-
-    /**
-     * Get the current page index for Material Paginator (0-based)
-     */
-    getCurrentPageIndex(): number
-    {
-        return this.currentPage - 1;
-    }
-
-    /**
-     * Get grid columns classes based on page size
-     */
-    getGridClasses(): string
-    {
-        const baseClasses = 'grid gap-8 blog-grid-transition';
-        switch (this.pageSize) {
-            case 6:
-                return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
-            case 9:
-                return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
-            case 12:
-                return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`;
-            case 18:
-                return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6`;
-            default:
-                return `${baseClasses} grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
-        }
     }
 
     /**
@@ -289,17 +290,20 @@ export class BlogComponent implements OnInit, OnDestroy
     private updateUrl(): void
     {
         const queryParams: any = {};
+        const currentPage = this._currentPage$.value;
+        const pageSize = this._pageSize$.value;
+        const searchQuery = this._searchQuery$.value;
         
-        if (this.currentPage > 1) {
-            queryParams.page = this.currentPage;
+        if (currentPage > 1) {
+            queryParams.page = currentPage;
         }
         
-        if (this.pageSize !== 9) {
-            queryParams.pageSize = this.pageSize;
+        if (pageSize !== 9) {
+            queryParams.pageSize = pageSize;
         }
         
-        if (this.searchQuery.trim()) {
-            queryParams.search = this.searchQuery.trim();
+        if (searchQuery.trim()) {
+            queryParams.search = searchQuery.trim();
         }
         
         this.router.navigate([], {

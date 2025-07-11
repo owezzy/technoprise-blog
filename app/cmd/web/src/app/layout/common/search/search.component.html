@@ -1,13 +1,13 @@
 <!-- Bar search -->
 @if (appearance === 'bar') {
-    @if (!opened) {
+    @if (!(opened$ | async)) {
         <button mat-icon-button (click)="open()">
             <mat-icon
                 [svgIcon]="'heroicons_outline:magnifying-glass'"
             ></mat-icon>
         </button>
     }
-    @if (opened) {
+    @if (opened$ | async) {
         <div
             class="bg-card absolute inset-0 z-99 flex shrink-0 items-center"
             @slideInTop
@@ -21,7 +21,7 @@
                 class="h-full w-full px-16 sm:px-18"
                 [formControl]="searchControl"
                 [matAutocomplete]="matAutocomplete"
-                [placeholder]="isSearchActive ? 'Search blog posts...' : 'Search...'"
+                [placeholder]="(isSearchActive$ | async) ? 'Search blog posts...' : 'Search...'"
                 (keydown)="onKeydown($event)"
                 #barSearchInput
             />
@@ -31,15 +31,8 @@
                 [disableRipple]="true"
                 #matAutocomplete="matAutocomplete"
             >
-                @if (resultSets && !resultSets.length) {
-                    <mat-option
-                        class="text-secondary pointer-events-none bg-transparent px-6 py-0 text-md"
-                    >
-                        No results found!
-                    </mat-option>
-                }
                 @for (
-                    resultSet of resultSets;
+                    resultSet of (resultSets$ | async);
                     track trackByFn($index, resultSet)
                 ) {
                     <mat-optgroup class="mt-2 flex items-center px-2">
@@ -120,7 +113,7 @@
                 matInput
                 [formControl]="searchControl"
                 [matAutocomplete]="matAutocomplete"
-                [placeholder]="isSearchActive ? 'Search blog posts...' : 'Search...'"
+                [placeholder]="(isSearchActive$ | async) ? 'Search blog posts...' : 'Search...'"
                 (keydown)="onKeydown($event)"
             />
         </mat-form-field>
@@ -130,14 +123,7 @@
             [disableRipple]="true"
             #matAutocomplete="matAutocomplete"
         >
-            @if (resultSets && !resultSets.length) {
-                <mat-option
-                    class="text-secondary pointer-events-none bg-transparent px-6 py-0 text-md"
-                >
-                    No results found!
-                </mat-option>
-            }
-            @for (resultSet of resultSets; track trackByFn($index, resultSet)) {
+            @for (resultSet of (resultSets$ | async); track trackByFn($index, resultSet)) {
                 <mat-optgroup class="mt-2 flex items-center px-2">
                     <span
                         class="text-secondary text-sm font-semibold tracking-wider"

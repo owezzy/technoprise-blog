@@ -1,5 +1,5 @@
 import { Overlay } from '@angular/cdk/overlay';
-import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { NgClass, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
     Component,
@@ -34,7 +34,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { RouterLink, Router } from '@angular/router';
 import { fuseAnimations } from '@fuse/animations/public-api';
-import { Subject, debounceTime, filter, map, takeUntil } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, combineLatest, debounceTime, filter, map, switchMap, takeUntil, startWith, take } from 'rxjs';
 import { BlogSearchService } from 'app/modules/blog/blog-search.service';
 
 @Component({
@@ -55,6 +55,7 @@ import { BlogSearchService } from 'app/modules/blog/blog-search.service';
         MatFormFieldModule,
         MatInputModule,
         NgClass,
+        AsyncPipe,
     ],
     providers: [
         {
@@ -72,10 +73,17 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
     @Input() minLength: number = 2;
     @Output() search: EventEmitter<any> = new EventEmitter<any>();
 
-    opened: boolean = false;
-    resultSets: any[];
+    // BehaviorSubjects for state management
+    private _opened$ = new BehaviorSubject<boolean>(false);
+    private _resultSets$ = new BehaviorSubject<any[]>([]);
+    
+    // Reactive streams for template consumption
+    opened$ = this._opened$.asObservable();
+    resultSets$ = this._resultSets$.asObservable();
+    isSearchActive$ = this._blogSearchService.isSearchActive$;
+    searchQuery$ = this._blogSearchService.searchQuery$;
+    
     searchControl: UntypedFormControl = new UntypedFormControl();
-    isSearchActive: boolean = false;
     private _matAutocomplete: MatAutocomplete;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
 
@@ -101,7 +109,7 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
         return {
             'search-appearance-bar': this.appearance === 'bar',
             'search-appearance-basic': this.appearance === 'basic',
-            'search-opened': this.opened,
+            'search-opened': this._opened$.value,
         };
     }
 
@@ -155,66 +163,56 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
      * On init
      */
     ngOnInit(): void {
-        // Subscribe to blog search active state
-        this._blogSearchService.isSearchActive$
+        // Initialize search control with current query when search becomes active
+        combineLatest([this.isSearchActive$, this.searchQuery$])
             .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe(isActive => {
-                this.isSearchActive = isActive;
-                
-                // Clear search control when search becomes inactive but don't hide component
-                if (!isActive && this.searchControl.value) {
+            .subscribe(([isActive, query]) => {
+                if (isActive && query && query !== this.searchControl.value) {
+                    this.searchControl.setValue(query, { emitEvent: false });
+                } else if (!isActive && this.searchControl.value) {
                     this.searchControl.setValue('', { emitEvent: false });
                 }
             });
 
-        // Subscribe to blog search query changes
-        this._blogSearchService.searchQuery$
-            .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe(query => {
-                if (this.isSearchActive && query !== this.searchControl.value) {
-                    this.searchControl.setValue(query, { emitEvent: false });
+        // Handle search input changes
+        combineLatest([
+            this.searchControl.valueChanges.pipe(
+                startWith(''),
+                debounceTime(this.debounce)
+            ),
+            this.isSearchActive$
+        ])
+        .pipe(
+            takeUntil(this._unsubscribeAll),
+            map(([value, isActive]) => {
+                // Clear results if value is too short
+                if (!value || value.length < this.minLength) {
+                    this._resultSets$.next([]);
+                    return null;
                 }
-            });
 
-        // Subscribe to the search field value changes
-        this.searchControl.valueChanges
-            .pipe(
-                debounceTime(this.debounce),
-                takeUntil(this._unsubscribeAll),
-                map((value) => {
-                    // Set the resultSets to null if there is no value or
-                    // the length of the value is smaller than the minLength
-                    // so the autocomplete panel can be closed
-                    if (!value || value.length < this.minLength) {
-                        this.resultSets = null;
-                    }
+                // Update blog search service if active
+                if (isActive) {
+                    this._blogSearchService.setSearchQuery(value);
+                }
 
-                    // If blog search is active, update the blog search service
-                    if (this.isSearchActive) {
-                        this._blogSearchService.setSearchQuery(value || '');
-                    }
-
-                    // Continue
-                    return value;
-                }),
-                // Filter out undefined/null/false statements and also
-                // filter out the values that are smaller than minLength
-                filter((value) => value && value.length >= this.minLength)
-            )
-            .subscribe((value) => {
+                return { value, isActive };
+            }),
+            filter(result => result !== null),
+            switchMap(({ value, isActive }) => {
                 // Only perform global search if blog search is not active
-                if (!this.isSearchActive) {
-                    this._httpClient
-                        .post('api/common/search', { query: value })
-                        .subscribe((resultSets: any) => {
-                            // Store the result sets
-                            this.resultSets = resultSets;
-
-                            // Execute the event
-                            this.search.next(resultSets);
-                        });
+                if (!isActive) {
+                    return this._httpClient.post('api/common/search', { query: value });
                 }
-            });
+                return [];
+            })
+        )
+        .subscribe((resultSets: any) => {
+            if (resultSets) {
+                this._resultSets$.next(resultSets);
+                this.search.next(resultSets);
+            }
+        });
     }
 
     /**
@@ -251,12 +249,12 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
      */
     open(): void {
         // Return if it's already opened
-        if (this.opened) {
+        if (this._opened$.value) {
             return;
         }
 
         // Open the search
-        this.opened = true;
+        this._opened$.next(true);
     }
 
     /**
@@ -265,7 +263,7 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
      */
     close(): void {
         // Return if it's already closed
-        if (!this.opened) {
+        if (!this._opened$.value) {
             return;
         }
 
@@ -273,12 +271,17 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
         this.searchControl.setValue('');
         
         // Clear search in blog search service if active
-        if (this.isSearchActive) {
-            this._blogSearchService.setSearchQuery('');
-        }
+        // Use take(1) to get current value without persistent subscription
+        this.isSearchActive$.pipe(
+            take(1)
+        ).subscribe(isActive => {
+            if (isActive) {
+                this._blogSearchService.setSearchQuery('');
+            }
+        });
 
         // Close the search
-        this.opened = false;
+        this._opened$.next(false);
     }
 
     /**

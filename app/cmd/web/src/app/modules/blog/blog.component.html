@@ -24,12 +24,12 @@
     <!-- Main -->
     <div class="flex-auto p-6 sm:p-10 pb-0">
         <!-- Loading State -->
-        <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div *ngIf="loading$ | async" class="flex justify-center items-center py-20">
             <mat-spinner diameter="50"></mat-spinner>
         </div>
 
         <!-- Error State -->
-        <div *ngIf="error" class="mb-8">
+        <div *ngIf="error$ | async as error" class="mb-8">
             <fuse-alert
                 [appearance]="'outline'"
                 [type]="'error'"
@@ -44,23 +44,23 @@
         </div>
 
         <!-- Search Results Info -->
-        <div *ngIf="!loading && !error && searchQuery" class="mb-6 p-4 bg-card rounded-lg border">
+        <div *ngIf="!(loading$ | async) && !(error$ | async) && (searchQuery$ | async) as searchQuery" class="mb-6 p-4 bg-card rounded-lg border">
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-lg font-semibold">Search Results</h3>
                     <p class="text-secondary">
-                        Found {{ totalRecords }} result{{ totalRecords !== 1 ? 's' : '' }} for "{{ searchQuery }}"
+                        Found {{ totalRecords$ | async }} result{{ (totalRecords$ | async) !== 1 ? 's' : '' }} for "{{ searchQuery }}"
                     </p>
                 </div>
             </div>
         </div>
 
         <!-- Blog Posts Grid -->
-        <div *ngIf="!loading && !error">
+        <div *ngIf="!(loading$ | async) && !(error$ | async)">
             <!-- Posts Grid -->
-            <div *ngIf="posts.length > 0; else emptyState" [ngClass]="getGridClasses()">
+            <div *ngIf="(posts$ | async)?.length > 0; else emptyState" [ngClass]="gridClasses$ | async">
                 <article 
-                    *ngFor="let post of posts; trackBy: trackByPostId"
+                    *ngFor="let post of (posts$ | async); trackBy: trackByPostId"
                     class="group cursor-pointer"
                     [routerLink]="['/blog', post.slug]"
                 >
@@ -142,28 +142,28 @@
             <!-- Material Paginator - Always visible at bottom center -->
             <div class="flex justify-center mt-8 pt-6 border-t border-gray-200">
                 <!-- Loading state for paginator -->
-                <div *ngIf="loading" class="flex items-center justify-center py-4 paginator-loading">
+                <div *ngIf="loading$ | async" class="flex items-center justify-center py-4 paginator-loading">
                     <mat-spinner diameter="24" class="mr-3"></mat-spinner>
                     <span class="text-secondary text-sm">Loading pagination...</span>
                 </div>
                 
                 <!-- Paginator -->
                 <mat-paginator
-                    *ngIf="showPaginator"
-                    [length]="totalRecords"
-                    [pageSize]="pageSize"
+                    *ngIf="showPaginator$ | async"
+                    [length]="totalRecords$ | async"
+                    [pageSize]="pageSize$ | async"
                     [pageSizeOptions]="pageSizeOptions"
-                    [pageIndex]="getCurrentPageIndex()"
+                    [pageIndex]="currentPageIndex$ | async"
                     [showFirstLastButtons]="true"
                     [hidePageSize]="false"
-                    [disabled]="loading"
+                    [disabled]="loading$ | async"
                     (page)="onPageChange($event)"
                     aria-label="Blog pagination"
                     class="bg-transparent w-full max-w-2xl">
                 </mat-paginator>
                 
                 <!-- Empty state message for paginator -->
-                <div *ngIf="!loading && !showPaginator && posts.length === 0" 
+                <div *ngIf="!(loading$ | async) && !(showPaginator$ | async) && (posts$ | async)?.length === 0" 
                      class="flex items-center justify-center p-8 text-secondary">
                     <mat-icon class="mr-2">info</mat-icon>
                     <span>No posts to paginate</span>
