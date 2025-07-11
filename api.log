@@ -1,0 +1,6 @@
+{"time":"2025-07-11T11:30:53.205749+03:00","level":"INFO","file":"main.go:108","msg":"application starting up","version":"-","environment":"development","port":4000}
+{"time":"2025-07-11T11:30:53.206001+03:00","level":"INFO","file":"main.go:114","msg":"database connection pool established"}
+{"time":"2025-07-11T11:30:53.20607+03:00","level":"INFO","file":"main.go:155","msg":"starting API server","addr":":4000","env":"development"}
+{"time":"2025-07-11T11:30:53.206127+03:00","level":"INFO","file":"server.go:63","msg":"TECHNOPRISE server starting","addr":":4000","env":"development","version":"-"}
+{"time":"2025-07-11T11:30:53.206276+03:00","level":"ERROR","file":"main.go:163","msg":"server failed to start","error":"listen tcp :4000: bind: address already in use"}
+exit status 1

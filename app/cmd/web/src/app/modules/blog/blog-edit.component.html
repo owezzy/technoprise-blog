@@ -1,0 +1,254 @@
+<!-- Fuse Layout Structure -->
+<div class="flex min-w-0 flex-auto flex-col">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-6 sm:py-8 border-b bg-card gap-4">
+        <div class="flex-1">
+            <!-- Breadcrumb -->
+            <div class="flex flex-wrap items-center text-sm font-medium mb-4">
+                <a class="text-primary hover:text-primary-600 transition-colors" [routerLink]="['/blog']">Blog</a>
+                <mat-icon class="mx-2 text-secondary" style="font-size: 16px; height: 16px; width: 16px;">chevron_right</mat-icon>
+                <span class="text-secondary">{{ isNewPost ? 'New Post' : 'Edit Post' }}</span>
+            </div>
+            
+            <!-- Title -->
+            <h1 class="text-3xl font-extrabold tracking-tight leading-tight">
+                {{ isNewPost ? 'Create New Post' : 'Edit Post' }}
+            </h1>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3">
+            <button
+                mat-stroked-button
+                [disabled]="saving"
+                (click)="cancel()">
+                <mat-icon class="mr-2">close</mat-icon>
+                Cancel
+            </button>
+            <button
+                mat-flat-button
+                [color]="'primary'"
+                [disabled]="saving || editForm.invalid"
+                (click)="savePost()">
+                <mat-icon *ngIf="saving" class="mr-2 animate-spin">refresh</mat-icon>
+                <mat-icon *ngIf="!saving" class="mr-2">check</mat-icon>
+                {{ isNewPost ? 'Publish' : 'Update' }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-auto p-6 sm:p-10">
+    <!-- Loading -->
+    <div *ngIf="loading" class="flex items-center justify-center py-20">
+        <mat-spinner [diameter]="40"></mat-spinner>
+    </div>
+
+    <!-- Error Alert -->
+    <fuse-alert
+        *ngIf="error"
+        class="mb-6"
+        [appearance]="'outline'"
+        [showIcon]="false"
+        [type]="'error'">
+        {{ error }}
+        <button
+            class="ml-2"
+            mat-button
+            [color]="'warn'"
+            (click)="clearError()">
+            <mat-icon
+                class="icon-size-5"
+                [svgIcon]="'heroicons_mini:x-mark'"></mat-icon>
+        </button>
+    </fuse-alert>
+
+    <!-- Edit Form -->
+    <div *ngIf="!loading" class="max-w-4xl mx-auto">
+        <form [formGroup]="editForm" class="space-y-8">
+
+            <!-- Featured Image Upload -->
+            <div class="bg-card rounded-lg border p-6">
+                <h3 class="text-lg font-semibold mb-4">Featured Image</h3>
+
+                <!-- Image Preview -->
+                <div class="mb-4">
+                    <div *ngIf="featuredImagePreview || (post?.featured_image)"
+                         class="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                        <img
+                            [src]="featuredImagePreview || getImageUrl(post?.featured_image?.filename!)"
+                            [alt]="post?.featured_image?.alt_text || 'Featured image'"
+                            class="w-full h-full object-cover">
+
+                        <!-- Loading overlay -->
+                        <div *ngIf="deletingImage" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                            <mat-spinner diameter="40"></mat-spinner>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="absolute top-2 right-2 flex gap-2">
+                            <button
+                                type="button"
+                                mat-mini-fab
+                                color="accent"
+                                (click)="replaceImage()"
+                                [disabled]="deletingImage"
+                                title="Replace image">
+                                <mat-icon>edit</mat-icon>
+                            </button>
+                            <button
+                                type="button"
+                                mat-mini-fab
+                                color="warn"
+                                (click)="removeFeaturedImage()"
+                                [disabled]="deletingImage"
+                                title="Delete image">
+                                <mat-icon>delete</mat-icon>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Upload Button -->
+                    <div *ngIf="!featuredImagePreview && !post?.featured_image"
+                         class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
+                        <input
+                            type="file"
+                            #fileInput
+                            accept="image/*"
+                            (change)="onImageSelected($event)"
+                            class="hidden">
+                        <mat-icon class="text-gray-400 text-4xl mb-2">cloud_upload</mat-icon>
+                        <p class="text-secondary mb-2">Drag and drop an image here, or</p>
+                        <button
+                            type="button"
+                            mat-stroked-button
+                            (click)="fileInput.click()">
+                            Choose Image
+                        </button>
+                        <p class="text-xs text-secondary mt-2">PNG, JPG, WEBP up to 10MB</p>
+                    </div>
+                </div>
+
+                <!-- Image Alt Text -->
+                <mat-form-field *ngIf="featuredImagePreview || post?.featured_image" class="w-full">
+                    <mat-label>Alt Text</mat-label>
+                    <input matInput [(ngModel)]="imageAltText" placeholder="Describe the image for accessibility">
+                </mat-form-field>
+            </div>
+
+            <!-- Post Content -->
+            <div class="bg-card rounded-lg border p-6">
+                <h3 class="text-lg font-semibold mb-4">Post Details</h3>
+
+                <div class="space-y-6">
+                    <!-- Title Field -->
+                    <mat-form-field class="w-full" appearance="outline">
+                        <mat-label>Title</mat-label>
+                        <input
+                            matInput
+                            formControlName="title"
+                            placeholder="Enter an engaging title"
+                            [maxlength]="255">
+                        <mat-error *ngIf="getFieldError('title')">
+                            {{ getFieldError('title') }}
+                        </mat-error>
+                        <mat-hint align="end">{{ editForm.get('title')?.value?.length || 0 }}/255</mat-hint>
+                    </mat-form-field>
+
+                    <!-- Slug Field -->
+                    <mat-form-field class="w-full" appearance="outline">
+                        <mat-label>URL Slug</mat-label>
+                        <input
+                            matInput
+                            formControlName="slug"
+                            placeholder="post-url-slug"
+                            [maxlength]="255">
+                        <mat-error *ngIf="getFieldError('slug')">
+                            {{ getFieldError('slug') }}
+                        </mat-error>
+                        <mat-hint>This will be the URL for your post</mat-hint>
+                    </mat-form-field>
+
+                    <!-- Excerpt Field -->
+                    <mat-form-field class="w-full" appearance="outline">
+                        <mat-label>Excerpt</mat-label>
+                        <textarea
+                            matInput
+                            formControlName="excerpt"
+                            placeholder="Write a brief summary that will appear in post previews"
+                            [maxlength]="500"
+                            rows="3">
+                        </textarea>
+                        <mat-error *ngIf="getFieldError('excerpt')">
+                            {{ getFieldError('excerpt') }}
+                        </mat-error>
+                        <mat-hint align="end">{{ editForm.get('excerpt')?.value?.length || 0 }}/500</mat-hint>
+                    </mat-form-field>
+
+                    <!-- Content Field -->
+                    <mat-form-field class="w-full" appearance="outline">
+                        <mat-label>Content</mat-label>
+                        <textarea
+                            matInput
+                            formControlName="content"
+                            placeholder="Write your post content here... You can use markdown formatting."
+                            rows="20">
+                        </textarea>
+                        <mat-error *ngIf="getFieldError('content')">
+                            {{ getFieldError('content') }}
+                        </mat-error>
+                        <mat-hint>Supports markdown formatting</mat-hint>
+                    </mat-form-field>
+                </div>
+            </div>
+
+            <!-- Publish Status -->
+            <div *ngIf="post" class="bg-card rounded-lg border p-6">
+                <h3 class="text-lg font-semibold mb-4">Publication Info</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-secondary block">Status</span>
+                        <span class="font-medium text-green-600">Published</span>
+                    </div>
+                    <div>
+                        <span class="text-secondary block">Created</span>
+                        <span class="font-medium">{{ post.created_at | date:'medium' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-secondary block">Last Updated</span>
+                        <span class="font-medium">{{ post.updated_at | date:'medium' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-secondary block">Version</span>
+                        <span class="font-medium">{{ post.version }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons (Mobile) -->
+            <div class="flex flex-col sm:hidden gap-3">
+                <button
+                    type="button"
+                    mat-flat-button
+                    [color]="'primary'"
+                    [disabled]="saving || editForm.invalid"
+                    (click)="savePost()"
+                    class="w-full">
+                    <mat-icon *ngIf="saving" class="mr-2 animate-spin">refresh</mat-icon>
+                    <mat-icon *ngIf="!saving" class="mr-2">check</mat-icon>
+                    {{ isNewPost ? 'Publish Post' : 'Update Post' }}
+                </button>
+                <button
+                    type="button"
+                    mat-stroked-button
+                    [disabled]="saving"
+                    (click)="cancel()"
+                    class="w-full">
+                    <mat-icon class="mr-2">close</mat-icon>
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>

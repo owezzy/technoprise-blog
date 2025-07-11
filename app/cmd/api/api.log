@@ -1,0 +1,4 @@
+{"time":"2025-07-11T11:21:01.427248+03:00","level":"INFO","file":"main.go:108","msg":"application starting up","version":"-","environment":"development","port":4000}
+{"time":"2025-07-11T11:21:01.427494+03:00","level":"INFO","file":"main.go:114","msg":"database connection pool established"}
+{"time":"2025-07-11T11:21:01.427531+03:00","level":"INFO","file":"main.go:155","msg":"starting API server","addr":":4000","env":"development"}
+{"time":"2025-07-11T11:21:01.427548+03:00","level":"INFO","file":"server.go:63","msg":"TECHNOPRISE server starting","addr":":4000","env":"development","version":"-"}

@@ -1,0 +1,70 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: technoprise_db
+    environment:
+      POSTGRES_DB: technoprise
+      POSTGRES_USER: technoprise
+      POSTGRES_PASSWORD: pa55word
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/01-init-db.sh
+    ports:
+      - "5435:5432"
+    networks:
+      - technoprise-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U technoprise -d technoprise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Go Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: technoprise_backend
+    environment:
+      - PORT=4000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=technoprise
+      - DB_PASSWORD=pa55word
+      - DB_NAME=technoprise
+      - TECHNOPRISE_DB_DSN=postgres://technoprise:pa55word@postgres:5432/technoprise?sslmode=disable
+      - CORS_TRUSTED_ORIGINS=http://localhost:4200 http://frontend:80
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - technoprise-network
+    volumes:
+      - ./uploads:/root/uploads
+    restart: unless-stopped
+
+  # Angular Frontend
+  frontend:
+    build:
+      context: ./app/cmd/web
+      dockerfile: Dockerfile
+    container_name: technoprise_frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - technoprise-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  technoprise-network:
+    driver: bridge

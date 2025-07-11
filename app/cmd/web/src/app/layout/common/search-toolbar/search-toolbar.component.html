@@ -1,0 +1,42 @@
+<mat-toolbar class="search-toolbar flex items-center gap-4 border-b bg-card px-4 py-3">
+    <!-- Logo/Brand -->
+    <div class="flex items-center">
+        <h1 class="text-2xl font-bold text-primary">Technoprise</h1>
+    </div>
+
+    <!-- Spacer -->
+    <div class="flex-1"></div>
+
+    <!-- Search Field -->
+    <div class="flex items-center gap-4">
+        <mat-form-field class="search-field min-w-80" appearance="outline" [subscriptSizing]="'dynamic'">
+            <mat-icon matPrefix [svgIcon]="'heroicons_outline:magnifying-glass'"></mat-icon>
+            <input 
+                matInput 
+                [formControl]="searchControl"
+                [placeholder]="placeholder"
+                class="search-input"
+            >
+            @if (searchControl.value) {
+                <button 
+                    matSuffix 
+                    mat-icon-button 
+                    (click)="clearSearch()"
+                    class="search-clear-button"
+                >
+                    <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+                </button>
+            }
+        </mat-form-field>
+
+        <!-- New Post Button -->
+        <button
+            mat-flat-button
+            [color]="'primary'"
+            [routerLink]="['/blog/new']"
+            class="new-post-button">
+            <mat-icon class="mr-2">add</mat-icon>
+            New Post
+        </button>
+    </div>
+</mat-toolbar>

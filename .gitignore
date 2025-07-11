@@ -1,0 +1,5 @@
+.envrc
+bin/
+.idea/
+.DS_Store
+app/cmd/web/node_modules
