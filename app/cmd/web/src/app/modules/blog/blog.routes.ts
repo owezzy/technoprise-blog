@@ -1,23 +1,44 @@
 import { Routes } from '@angular/router';
-import { BlogContainerComponent } from 'app/modules/blog/blog.container';
-import { BlogDetailComponent } from 'app/modules/blog/blog-detail.component';
-import { BlogEditComponent } from 'app/modules/blog/blog-edit.component';
+import { provideState } from '@ngrx/store';
+import { provideEffects } from '@ngrx/effects';
+import { BlogContainerComponent } from './containers/blog.container';
+import { BlogEditContainerComponent } from './containers/blog-edit.container';
+import { BlogDetailContainerComponent } from './containers/blog-detail.container';
+import * as fromBlog from './reducers';
+import { BlogEffects, CollectionEffects, BlogDetailEffects, BlogEditEffects } from './effects';
+
 
 export default [
     {
         path     : '',
         component: BlogContainerComponent,
+        providers: [
+            provideState(fromBlog.blogsFeatureKey, fromBlog.reducers),
+            provideEffects([BlogEffects, CollectionEffects, BlogDetailEffects, BlogEditEffects])
+        ],
     },
     {
         path     : 'new',
-        component: BlogEditComponent,
+        component: BlogEditContainerComponent,
+        providers: [
+            provideState(fromBlog.blogsFeatureKey, fromBlog.reducers),
+            provideEffects([BlogEffects, CollectionEffects, BlogDetailEffects, BlogEditEffects])
+        ],
     },
     {
         path     : 'edit/:id',
-        component: BlogEditComponent,
+        component: BlogEditContainerComponent,
+        providers: [
+            provideState(fromBlog.blogsFeatureKey, fromBlog.reducers),
+            provideEffects([BlogEffects, CollectionEffects, BlogDetailEffects, BlogEditEffects])
+        ],
     },
     {
         path     : ':slug',
-        component: BlogDetailComponent,
+        component: BlogDetailContainerComponent,
+        providers: [
+            provideState(fromBlog.blogsFeatureKey, fromBlog.reducers),
+            provideEffects([BlogEffects, CollectionEffects, BlogDetailEffects, BlogEditEffects])
+        ],
     },
 ] as Routes;

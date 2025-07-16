@@ -11,16 +11,17 @@
     <div class="flex items-center gap-4">
         <mat-form-field class="search-field min-w-80" appearance="outline" [subscriptSizing]="'dynamic'">
             <mat-icon matPrefix [svgIcon]="'heroicons_outline:magnifying-glass'"></mat-icon>
-            <input 
-                matInput 
+            <input
+                matInput
                 [formControl]="searchControl"
                 [placeholder]="placeholder"
                 class="search-input"
+                (keydown)="onSearch($event)"
             >
             @if (searchControl.value) {
-                <button 
-                    matSuffix 
-                    mat-icon-button 
+                <button
+                    matSuffix
+                    mat-icon-button
                     (click)="clearSearch()"
                     class="search-clear-button"
                 >

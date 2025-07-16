@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewEncapsulation } from '@angular/core';
+import {Component, OnInit, OnDestroy, ViewEncapsulation, Input, Output, EventEmitter} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -28,6 +28,10 @@ import { BlogSearchService } from 'app/modules/blog/blog-search.service';
     encapsulation: ViewEncapsulation.None
 })
 export class SearchToolbarComponent implements OnInit, OnDestroy {
+    @Input() query = '';
+    @Input() searching = false;
+    @Input() error = '';
+    @Output() searchBlogs = new EventEmitter<string>();
     searchControl = new FormControl('');
     isSearchActive = false;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
@@ -40,7 +44,7 @@ export class SearchToolbarComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this._unsubscribeAll))
             .subscribe(isActive => {
                 this.isSearchActive = isActive;
-                
+
                 // Clear search control when search becomes inactive
                 if (!isActive && this.searchControl.value) {
                     this.searchControl.setValue('', { emitEvent: false });
@@ -84,5 +88,10 @@ export class SearchToolbarComponent implements OnInit, OnDestroy {
 
     get placeholder(): string {
         return this.isSearchActive ? 'Search blog posts...' : 'Search...';
+    }
+
+    onSearch(event: KeyboardEvent): void {
+        console.log(event);
+        this.searchBlogs.emit((event.target as HTMLInputElement).value);
     }
 }

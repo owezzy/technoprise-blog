@@ -1,0 +1,107 @@
+<div class="flex min-w-0 flex-auto flex-col min-h-screen">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-6 sm:py-8 border-b bg-card gap-4">
+        <div class="flex-1">
+            <h1 class="text-3xl font-extrabold tracking-tight leading-tight">
+                The Accessibility Blog
+            </h1>
+            <p class="text-secondary mt-2">
+                Insights and stories about making technology accessible for everyone
+            </p>
+        </div>
+        <div class="flex shrink-0 items-center">
+            <button
+                mat-flat-button
+                [color]="'primary'"
+                [routerLink]="['/blog/new']"
+                class="w-full sm:w-auto">
+                <mat-icon class="mr-2">add</mat-icon>
+                New Post
+            </button>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="flex-auto p-6 sm:p-10">
+        <!-- Search Results Info -->
+        <div *ngIf="!(loading$ | async) && !(error$ | async) && (searchQuery$ | async) && (searchQuery$ | async)!.length > 0" class="mb-6 p-4 bg-card rounded-lg border">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Search Results</h3>
+                    <p class="text-secondary">
+                        Found {{ totalRecords$ | async }} result{{ (totalRecords$ | async) !== 1 ? 's' : '' }} for "{{ searchQuery$ | async }}"
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Posts Info -->
+<!--        <div *ngIf="!(loading$ | async) && !(error$ | async) && (!(searchQuery$ | async) || (searchQuery$ | async)!.length === 0)" class="mb-6 p-4 bg-card rounded-lg border">-->
+<!--            <div class="flex items-center justify-between">-->
+<!--                <div>-->
+<!--                    <h3 class="text-lg font-semibold">All Blog Posts</h3>-->
+<!--                    <p class="text-secondary">-->
+<!--                        Showing {{ totalRecords$ | async }} blog post{{ (totalRecords$ | async) !== 1 ? 's' : '' }}-->
+<!--                    </p>-->
+<!--                </div>-->
+<!--            </div>-->
+<!--        </div>-->
+
+        <!-- Loading State -->
+        <div *ngIf="loading$ | async" class="flex justify-center items-center py-20">
+            <mat-spinner diameter="50"></mat-spinner>
+        </div>
+
+        <!-- Error State -->
+        <div *ngIf="error$ | async as error" class="mb-8">
+            <fuse-alert
+                [appearance]="'outline'"
+                [type]="'error'"
+                [dismissible]="true"
+                (dismissedChanged)="clearError()"
+            >
+                <div class="flex items-center">
+                    <mat-icon class="mr-2">error</mat-icon>
+                    <span>{{ error }}</span>
+                </div>
+            </fuse-alert>
+        </div>
+
+        <!-- Blog Posts Preview List -->
+        <div *ngIf="!(loading$ | async) && !(error$ | async)">
+            <blog-preview-list [posts]="(posts$ | async) || []"></blog-preview-list>
+
+            <!-- Empty State -->
+            <div *ngIf="(posts$ | async)?.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
+                <div class="w-32 h-32 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
+                    <mat-icon class="text-gray-400 text-5xl">article</mat-icon>
+                </div>
+                <h3 class="text-2xl font-semibold text-on-surface mb-4">No blog posts found</h3>
+                <p class="text-secondary text-lg max-w-md">
+                    Try adjusting your search or check back later for new content.
+                </p>
+            </div>
+        </div>
+
+        <!-- Material Paginator -->
+        <div *ngIf="showPaginator$ | async" class="flex justify-center mt-8 pt-6 border-t border-gray-200">
+            <mat-paginator
+                [length]="totalRecords$ | async"
+                [pageSize]="pageSize$ | async"
+                [pageSizeOptions]="pageSizeOptions"
+                [pageIndex]="currentPageIndex$ | async"
+                [showFirstLastButtons]="true"
+                [hidePageSize]="false"
+                [disabled]="loading$ | async"
+                (page)="onPageChange($event)"
+                aria-label="Blog pagination"
+                class="bg-transparent w-full max-w-2xl">
+            </mat-paginator>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="sticky bottom-0 flex flex-0 items-center justify-start w-full h-14 px-4 md:px-6 z-49 border-t bg-card dark:bg-transparent print:hidden mt-auto">
+        <span class="font-medium text-secondary">Fuse &copy; {{ currentYear }}</span>
+    </footer>
+</div>

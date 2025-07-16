@@ -8,7 +8,7 @@ import {
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { provideRouter, withInMemoryScrolling } from '@angular/router';
+import {provideRouter, withEnabledBlockingInitialNavigation, withInMemoryScrolling} from '@angular/router';
 import { provideFuse } from '@fuse';
 import { TranslocoService, provideTransloco } from '@jsverse/transloco';
 import { appRoutes } from 'app/app.routes';
@@ -17,6 +17,10 @@ import { provideIcons } from 'app/core/icons/icons.provider';
 import { MockApiService } from 'app/mock-api';
 import { firstValueFrom } from 'rxjs';
 import { TranslocoHttpLoader } from './core/transloco/transloco.http-loader';
+import {provideStore} from "@ngrx/store";
+import {provideStoreDevtools} from "@ngrx/store-devtools";
+import {metaReducers, rootReducers} from "./reducers";
+import {provideRouterStore} from "@ngrx/router-store";
 
 export const appConfig: ApplicationConfig = {
     providers: [
@@ -121,8 +125,12 @@ export const appConfig: ApplicationConfig = {
                 ],
             },
         }),
-
-        // state
-
+        provideStore(rootReducers, { metaReducers }),
+        provideStoreDevtools({
+            maxAge: 25,
+            // logOnly: !isDevMode(),
+            name: 'Technoprise App',
+        }),
+        provideRouterStore(),
     ],
 };

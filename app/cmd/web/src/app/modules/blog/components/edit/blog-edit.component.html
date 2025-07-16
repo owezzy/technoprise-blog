@@ -1,5 +1,5 @@
 <!-- Fuse Layout Structure -->
-<div class="flex min-w-0 flex-auto flex-col">
+<div class="flex min-w-0 flex-auto flex-col min-h-screen">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-6 sm:py-8 border-b bg-card gap-4">
         <div class="flex-1">
@@ -7,12 +7,12 @@
             <div class="flex flex-wrap items-center text-sm font-medium mb-4">
                 <a class="text-primary hover:text-primary-600 transition-colors" [routerLink]="['/blog']">Blog</a>
                 <mat-icon class="mx-2 text-secondary" style="font-size: 16px; height: 16px; width: 16px;">chevron_right</mat-icon>
-                <span class="text-secondary">{{ isNewPost ? 'New Post' : 'Edit Post' }}</span>
+                <span class="text-secondary">{{ !isEditMode ? 'New Post' : 'Edit Post' }}</span>
             </div>
-            
+
             <!-- Title -->
             <h1 class="text-3xl font-extrabold tracking-tight leading-tight">
-                {{ isNewPost ? 'Create New Post' : 'Edit Post' }}
+                {{ !isEditMode ? 'Create New Post' : 'Edit Post' }}
             </h1>
         </div>
 
@@ -21,7 +21,7 @@
             <button
                 mat-stroked-button
                 [disabled]="saving"
-                (click)="cancel()">
+                [routerLink]="['/blog']">
                 <mat-icon class="mr-2">close</mat-icon>
                 Cancel
             </button>
@@ -29,10 +29,10 @@
                 mat-flat-button
                 [color]="'primary'"
                 [disabled]="saving || editForm.invalid"
-                (click)="savePost()">
+                (click)="onSubmit()">
                 <mat-icon *ngIf="saving" class="mr-2 animate-spin">refresh</mat-icon>
                 <mat-icon *ngIf="!saving" class="mr-2">check</mat-icon>
-                {{ isNewPost ? 'Publish' : 'Update' }}
+                {{ !isEditMode ? 'Publish' : 'Update' }}
             </button>
         </div>
     </div>
@@ -41,7 +41,7 @@
     <div class="flex-auto p-6 sm:p-10">
     <!-- Loading -->
     <div *ngIf="loading" class="flex items-center justify-center py-20">
-        <mat-spinner [diameter]="40"></mat-spinner>
+        <mat-spinner [diameter]="50"></mat-spinner>
     </div>
 
     <!-- Error Alert -->
@@ -68,20 +68,22 @@
         <form [formGroup]="editForm" class="space-y-8">
 
             <!-- Featured Image Upload -->
-            <div class="bg-card rounded-lg border p-6">
+            <div class="bg-card rounded-2xl shadow-sm border p-6">
                 <h3 class="text-lg font-semibold mb-4">Featured Image</h3>
 
                 <!-- Image Preview -->
                 <div class="mb-4">
-                    <div *ngIf="featuredImagePreview || (post?.featured_image)"
+                    <div *ngIf="featuredImagePreview || (blog?.post?.featured_image)"
                          class="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
                         <img
-                            [src]="featuredImagePreview || getImageUrl(post?.featured_image?.filename!)"
-                            [alt]="post?.featured_image?.alt_text || 'Featured image'"
+                            [lazyLoad]="featuredImagePreview || getImageUrl(blog.post?.featured_image?.filename!)"
+                            [defaultImage]="placeholderImage"
+                            [errorImage]="placeholderImage"
+                            [alt]="blog.post?.featured_image?.alt_text || 'Featured image'"
                             class="w-full h-full object-cover">
 
                         <!-- Loading overlay -->
-                        <div *ngIf="deletingImage" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                        <div *ngIf="uploadingImage" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                             <mat-spinner diameter="40"></mat-spinner>
                         </div>
 
@@ -91,17 +93,17 @@
                                 type="button"
                                 mat-mini-fab
                                 color="accent"
-                                (click)="replaceImage()"
-                                [disabled]="deletingImage"
-                                title="Replace image">
-                                <mat-icon>edit</mat-icon>
+                                (click)="clearSelectedImage()"
+                                [disabled]="uploadingImage"
+                                title="Clear current image">
+                                <mat-icon>refresh</mat-icon>
                             </button>
                             <button
                                 type="button"
                                 mat-mini-fab
                                 color="warn"
-                                (click)="removeFeaturedImage()"
-                                [disabled]="deletingImage"
+                                (click)="clearSelectedImage()"
+                                [disabled]="uploadingImage"
                                 title="Delete image">
                                 <mat-icon>delete</mat-icon>
                             </button>
@@ -109,7 +111,7 @@
                     </div>
 
                     <!-- Upload Button -->
-                    <div *ngIf="!featuredImagePreview && !post?.featured_image"
+                    <div *ngIf="!featuredImagePreview && !blog.post?.featured_image"
                          class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
                         <input
                             type="file"
@@ -117,27 +119,46 @@
                             accept="image/*"
                             (change)="onImageSelected($event)"
                             class="hidden">
-                        <mat-icon class="text-gray-400 text-4xl mb-2">cloud_upload</mat-icon>
-                        <p class="text-secondary mb-2">Drag and drop an image here, or</p>
-                        <button
-                            type="button"
-                            mat-stroked-button
-                            (click)="fileInput.click()">
-                            Choose Image
-                        </button>
-                        <p class="text-xs text-secondary mt-2">PNG, JPG, WEBP up to 10MB</p>
+
+                        <!-- Loading state -->
+                        <div *ngIf="uploadingImage" class="flex flex-col items-center">
+                            <mat-spinner diameter="40" class="mb-4"></mat-spinner>
+                            <p class="text-secondary">Uploading image...</p>
+                        </div>
+
+                        <!-- Default upload state -->
+                        <div *ngIf="!uploadingImage">
+                            <mat-icon class="text-gray-400 text-4xl mb-2">cloud_upload</mat-icon>
+                            <p class="text-secondary mb-2">Drag and drop an image here, or</p>
+                            <button
+                                type="button"
+                                mat-stroked-button
+                                (click)="fileInput.click()"
+                                [disabled]="uploadingImage">
+                                Choose Image
+                            </button>
+                            <p class="text-xs text-secondary mt-2">PNG, JPG, WEBP up to 10MB</p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Image Alt Text -->
-                <mat-form-field *ngIf="featuredImagePreview || post?.featured_image" class="w-full">
-                    <mat-label>Alt Text</mat-label>
-                    <input matInput [(ngModel)]="imageAltText" placeholder="Describe the image for accessibility">
-                </mat-form-field>
+                <!-- Upload Button for Selected Image -->
+                <div *ngIf="selectedImage && !uploadingImage" class="mb-4">
+                    <button
+                        type="button"
+                        mat-flat-button
+                        color="primary"
+                        (click)="onUploadImage()"
+                        class="w-full">
+                        <mat-icon class="mr-2">cloud_upload</mat-icon>
+                        Upload Selected Image
+                    </button>
+                </div>
+
             </div>
 
             <!-- Post Content -->
-            <div class="bg-card rounded-lg border p-6">
+            <div class="bg-card rounded-2xl shadow-sm border p-6">
                 <h3 class="text-lg font-semibold mb-4">Post Details</h3>
 
                 <div class="space-y-6">
@@ -149,8 +170,8 @@
                             formControlName="title"
                             placeholder="Enter an engaging title"
                             [maxlength]="255">
-                        <mat-error *ngIf="getFieldError('title')">
-                            {{ getFieldError('title') }}
+                        <mat-error *ngIf="editForm.get('title')?.errors?.['required']">
+                            Title is required
                         </mat-error>
                         <mat-hint align="end">{{ editForm.get('title')?.value?.length || 0 }}/255</mat-hint>
                     </mat-form-field>
@@ -163,8 +184,8 @@
                             formControlName="slug"
                             placeholder="post-url-slug"
                             [maxlength]="255">
-                        <mat-error *ngIf="getFieldError('slug')">
-                            {{ getFieldError('slug') }}
+                        <mat-error *ngIf="editForm.get('slug')?.errors?.['required']">
+                            Slug is required
                         </mat-error>
                         <mat-hint>This will be the URL for your post</mat-hint>
                     </mat-form-field>
@@ -179,8 +200,8 @@
                             [maxlength]="500"
                             rows="3">
                         </textarea>
-                        <mat-error *ngIf="getFieldError('excerpt')">
-                            {{ getFieldError('excerpt') }}
+                        <mat-error *ngIf="editForm.get('excerpt')?.errors?.['required']">
+                            Excerpt is required
                         </mat-error>
                         <mat-hint align="end">{{ editForm.get('excerpt')?.value?.length || 0 }}/500</mat-hint>
                     </mat-form-field>
@@ -194,16 +215,16 @@
                             placeholder="Write your post content here... You can use markdown formatting."
                             rows="20">
                         </textarea>
-                        <mat-error *ngIf="getFieldError('content')">
-                            {{ getFieldError('content') }}
+                        <mat-error *ngIf="editForm.get('content')?.errors?.['required']">
+                            Content is required
                         </mat-error>
-                        <mat-hint>Supports markdown formatting</mat-hint>
+<!--                        <mat-hint>Supports markdown formatting</mat-hint>-->
                     </mat-form-field>
                 </div>
             </div>
 
             <!-- Publish Status -->
-            <div *ngIf="post" class="bg-card rounded-lg border p-6">
+            <div *ngIf="blog.post && isEditMode" class="bg-card rounded-2xl shadow-sm border p-6">
                 <h3 class="text-lg font-semibold mb-4">Publication Info</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
@@ -212,15 +233,15 @@
                     </div>
                     <div>
                         <span class="text-secondary block">Created</span>
-                        <span class="font-medium">{{ post.created_at | date:'medium' }}</span>
+                        <span class="font-medium">{{ blog.post.created_at | date:'medium' }}</span>
                     </div>
                     <div>
                         <span class="text-secondary block">Last Updated</span>
-                        <span class="font-medium">{{ post.updated_at | date:'medium' }}</span>
+                        <span class="font-medium">{{ blog.post.updated_at | date:'medium' }}</span>
                     </div>
                     <div>
-                        <span class="text-secondary block">Version</span>
-                        <span class="font-medium">{{ post.version }}</span>
+                        <span class="text-secondary block">ID</span>
+                        <span class="font-medium">{{ blog.post.id }}</span>
                     </div>
                 </div>
             </div>
@@ -232,17 +253,17 @@
                     mat-flat-button
                     [color]="'primary'"
                     [disabled]="saving || editForm.invalid"
-                    (click)="savePost()"
+                    (click)="onSubmit()"
                     class="w-full">
                     <mat-icon *ngIf="saving" class="mr-2 animate-spin">refresh</mat-icon>
                     <mat-icon *ngIf="!saving" class="mr-2">check</mat-icon>
-                    {{ isNewPost ? 'Publish Post' : 'Update Post' }}
+                    {{ !isEditMode ? 'Publish Post' : 'Update Post' }}
                 </button>
                 <button
                     type="button"
                     mat-stroked-button
                     [disabled]="saving"
-                    (click)="cancel()"
+                    [routerLink]="['/blog']"
                     class="w-full">
                     <mat-icon class="mr-2">close</mat-icon>
                     Cancel
@@ -251,4 +272,9 @@
         </form>
     </div>
     </div>
+
+    <!-- Footer - Sticky at bottom -->
+    <footer class="sticky bottom-0 flex flex-0 items-center justify-start w-full h-14 px-4 md:px-6 z-49 border-t bg-card dark:bg-transparent print:hidden mt-auto">
+        <span class="font-medium text-secondary">Fuse &copy; {{ currentYear }}</span>
+    </footer>
 </div>
