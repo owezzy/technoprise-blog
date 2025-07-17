@@ -273,15 +273,28 @@ export class BlogPreviewComponent {
     styles: [`
         .blog-preview-list {
             display: grid;
-            gap: 2rem;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            padding: 1rem 0;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+            padding: 0;
         }
 
-        @media (max-width: 768px) {
+        @media (min-width: 640px) {
             .blog-preview-list {
-                grid-template-columns: 1fr;
-                gap: 1rem;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 1.5rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .blog-preview-list {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                gap: 2rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .blog-preview-list {
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             }
         }
     `],

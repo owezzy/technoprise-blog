@@ -264,6 +264,11 @@ export const selectBlogEditUploadingImage = createSelector(
   fromBlogEdit.getUploadingImage
 );
 
+export const selectBlogEditDeletingImage = createSelector(
+  selectBlogEditState,
+  fromBlogEdit.getDeletingImage
+);
+
 export const selectBlogEditImageUploadError = createSelector(
   selectBlogEditState,
   fromBlogEdit.getImageUploadError

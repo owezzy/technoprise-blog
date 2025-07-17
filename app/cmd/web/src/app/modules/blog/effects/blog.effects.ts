@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
 import { asyncScheduler, EMPTY as empty, of } from 'rxjs';
 import {
   catchError,
@@ -9,12 +10,15 @@ import {
   map,
   skip,
   switchMap,
+  take,
   takeUntil,
   tap,
 } from 'rxjs/operators';
 import { FindBlogPageActions } from '../actions/find-blog-page.actions';
 import { BlogsApiActions } from '../actions/blogs-api.actions';
+import { BlogEditApiActions } from '../actions/blog-edit-api.actions';
 import { BlogSearchService } from '../blog-search.service';
+import * as fromBlog from '../reducers';
 
 
 /**
@@ -32,7 +36,7 @@ import { BlogSearchService } from '../blog-search.service';
 export class BlogEffects {
   search$ = createEffect(
     () =>
-      ({ debounce = 2000, scheduler = asyncScheduler } = {}) =>
+      ({ debounce = 300, scheduler = asyncScheduler } = {}) =>
         this.actions$.pipe(
           ofType(FindBlogPageActions.searchBlogs, FindBlogPageActions.loadFromURL),
           debounceTime(debounce, scheduler),
@@ -42,7 +46,7 @@ export class BlogEffects {
               // For empty query, load first page of all blogs
               const params = new URLSearchParams();
               params.set('page', page.toString());
-              params.set('limit', pageSize.toString());
+              params.set('page_size', pageSize.toString());
               
               const nextSearch$ = this.actions$.pipe(
                 ofType(FindBlogPageActions.searchBlogs, FindBlogPageActions.loadFromURL),
@@ -60,9 +64,9 @@ export class BlogEffects {
 
             // Handle search query
             const params = new URLSearchParams();
-            params.set('search', query.trim());
+            params.set('title', query.trim());
             params.set('page', page.toString());
-            params.set('limit', pageSize.toString());
+            params.set('page_size', pageSize.toString());
 
             const nextSearch$ = this.actions$.pipe(
               ofType(FindBlogPageActions.searchBlogs, FindBlogPageActions.loadFromURL),
@@ -86,7 +90,7 @@ export class BlogEffects {
       switchMap(({ page, pageSize }) => {
         const params = new URLSearchParams();
         params.set('page', page.toString());
-        params.set('limit', pageSize.toString());
+        params.set('page_size', pageSize.toString());
 
         return this.blogSearchService.getBlogs(params.toString()).pipe(
           map((response) => BlogsApiActions.searchSuccess({ blogs: response })),
@@ -120,9 +124,42 @@ export class BlogEffects {
     { dispatch: false }
   );
 
+  // Refresh blog list after create/update/delete operations
+  refreshListAfterBlogOperations$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(
+        BlogEditApiActions.saveBlogSuccess,
+        BlogEditApiActions.updateBlogSuccess,
+        BlogEditApiActions.deleteBlogSuccess
+      ),
+      switchMap(() => {
+        // Trigger a refresh with current search query and reset to page 1
+        return this.store.select(fromBlog.selectSearchQuery).pipe(
+          take(1),
+          switchMap((currentQuery) => {
+            const params = new URLSearchParams();
+            if (currentQuery && currentQuery.trim()) {
+              params.set('title', currentQuery.trim());
+            }
+            params.set('page', '1');
+            params.set('page_size', '9');
+            
+            return this.blogSearchService.getBlogs(params.toString()).pipe(
+              map((response) => BlogsApiActions.searchSuccess({ blogs: response })),
+              catchError((err) =>
+                of(BlogsApiActions.searchFailure({ errorMsg: err.message }))
+              )
+            );
+          })
+        );
+      })
+    )
+  );
+
   constructor(
     private actions$: Actions,
     private blogSearchService: BlogSearchService,
-    private router: Router
+    private router: Router,
+    private store: Store
   ) {}
 }

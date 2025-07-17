@@ -39,10 +39,7 @@
 
     <!-- Main Content -->
     <div class="flex-auto p-6 sm:p-10">
-    <!-- Loading -->
-    <div *ngIf="loading" class="flex items-center justify-center py-20">
-        <mat-spinner [diameter]="50"></mat-spinner>
-    </div>
+    <!-- Loading is handled by FuseLoadingBar -->
 
     <!-- Error Alert -->
     <fuse-alert
@@ -73,19 +70,16 @@
 
                 <!-- Image Preview -->
                 <div class="mb-4">
-                    <div *ngIf="featuredImagePreview || (blog?.post?.featured_image)"
+                    <div *ngIf="featuredImagePreview || (blog?.featured_image)"
                          class="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
                         <img
-                            [lazyLoad]="featuredImagePreview || getImageUrl(blog.post?.featured_image?.filename!)"
+                            [lazyLoad]="featuredImagePreview || getImageUrl(blog?.featured_image?.filename!)"
                             [defaultImage]="placeholderImage"
                             [errorImage]="placeholderImage"
-                            [alt]="blog.post?.featured_image?.alt_text || 'Featured image'"
+                            [alt]="blog?.featured_image?.alt_text || 'Featured image'"
                             class="w-full h-full object-cover">
 
-                        <!-- Loading overlay -->
-                        <div *ngIf="uploadingImage" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                            <mat-spinner diameter="40"></mat-spinner>
-                        </div>
+                        <!-- Loading overlay is handled by FuseLoadingBar -->
 
                         <!-- Action buttons -->
                         <div class="absolute top-2 right-2 flex gap-2">
@@ -94,7 +88,7 @@
                                 mat-mini-fab
                                 color="accent"
                                 (click)="clearSelectedImage()"
-                                [disabled]="uploadingImage"
+                                [disabled]="uploadingImage || deletingImage"
                                 title="Clear current image">
                                 <mat-icon>refresh</mat-icon>
                             </button>
@@ -102,8 +96,8 @@
                                 type="button"
                                 mat-mini-fab
                                 color="warn"
-                                (click)="clearSelectedImage()"
-                                [disabled]="uploadingImage"
+                                (click)="onRemoveImage()"
+                                [disabled]="uploadingImage || deletingImage"
                                 title="Delete image">
                                 <mat-icon>delete</mat-icon>
                             </button>
@@ -111,7 +105,7 @@
                     </div>
 
                     <!-- Upload Button -->
-                    <div *ngIf="!featuredImagePreview && !blog.post?.featured_image"
+                    <div *ngIf="!featuredImagePreview && !blog?.featured_image"
                          class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
                         <input
                             type="file"
@@ -121,20 +115,20 @@
                             class="hidden">
 
                         <!-- Loading state -->
-                        <div *ngIf="uploadingImage" class="flex flex-col items-center">
-                            <mat-spinner diameter="40" class="mb-4"></mat-spinner>
-                            <p class="text-secondary">Uploading image...</p>
+                        <div *ngIf="uploadingImage || deletingImage" class="flex flex-col items-center">
+                            <mat-icon class="text-gray-400 text-4xl mb-2 animate-spin">refresh</mat-icon>
+                            <p class="text-secondary">{{ uploadingImage ? 'Uploading image...' : 'Deleting image...' }}</p>
                         </div>
 
                         <!-- Default upload state -->
-                        <div *ngIf="!uploadingImage">
+                        <div *ngIf="!uploadingImage && !deletingImage">
                             <mat-icon class="text-gray-400 text-4xl mb-2">cloud_upload</mat-icon>
                             <p class="text-secondary mb-2">Drag and drop an image here, or</p>
                             <button
                                 type="button"
                                 mat-stroked-button
                                 (click)="fileInput.click()"
-                                [disabled]="uploadingImage">
+                                [disabled]="uploadingImage || deletingImage">
                                 Choose Image
                             </button>
                             <p class="text-xs text-secondary mt-2">PNG, JPG, WEBP up to 10MB</p>
@@ -143,12 +137,13 @@
                 </div>
 
                 <!-- Upload Button for Selected Image -->
-                <div *ngIf="selectedImage && !uploadingImage" class="mb-4">
+                <div *ngIf="selectedImage && !uploadingImage && !deletingImage" class="mb-4">
                     <button
                         type="button"
                         mat-flat-button
                         color="primary"
                         (click)="onUploadImage()"
+                        [disabled]="uploadingImage || deletingImage"
                         class="w-full">
                         <mat-icon class="mr-2">cloud_upload</mat-icon>
                         Upload Selected Image
@@ -224,7 +219,7 @@
             </div>
 
             <!-- Publish Status -->
-            <div *ngIf="blog.post && isEditMode" class="bg-card rounded-2xl shadow-sm border p-6">
+            <div *ngIf="blog && isEditMode" class="bg-card rounded-2xl shadow-sm border p-6">
                 <h3 class="text-lg font-semibold mb-4">Publication Info</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
@@ -233,15 +228,15 @@
                     </div>
                     <div>
                         <span class="text-secondary block">Created</span>
-                        <span class="font-medium">{{ blog.post.created_at | date:'medium' }}</span>
+                        <span class="font-medium">{{ blog.created_at | date:'medium' }}</span>
                     </div>
                     <div>
                         <span class="text-secondary block">Last Updated</span>
-                        <span class="font-medium">{{ blog.post.updated_at | date:'medium' }}</span>
+                        <span class="font-medium">{{ blog.updated_at | date:'medium' }}</span>
                     </div>
                     <div>
                         <span class="text-secondary block">ID</span>
-                        <span class="font-medium">{{ blog.post.id }}</span>
+                        <span class="font-medium">{{ blog.id }}</span>
                     </div>
                 </div>
             </div>

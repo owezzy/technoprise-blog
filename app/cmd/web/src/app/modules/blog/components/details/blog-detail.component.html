@@ -1,8 +1,5 @@
 <div class="flex min-w-0 flex-auto flex-col min-h-screen">
-    <!-- Loading -->
-    <div *ngIf="loading" class="flex items-center justify-center min-h-96">
-        <mat-spinner diameter="50"></mat-spinner>
-    </div>
+    <!-- Loading is handled by FuseLoadingBar -->
 
     <!-- Error -->
     <div *ngIf="error && !loading" class="flex items-center justify-center min-h-96">
@@ -33,12 +30,12 @@
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <div class="text-sm text-secondary flex items-center">
                     <mat-icon class="text-hint mr-2" style="font-size: 16px; height: 16px; width: 16px;">schedule</mat-icon>
-                    {{ formatDate(blog.post.published_at) }}
+                    {{ formatDate(blog.published_at) }}
                 </div>
                 <button
                     mat-flat-button
                     [color]="'primary'"
-                    [routerLink]="['/blog/edit', blog.post.id]"
+                    [routerLink]="['/blog/edit', blog.id]"
                     class="flex items-center w-full sm:w-auto justify-center">
                     <mat-icon class="mr-2">edit</mat-icon>
                     Edit
@@ -52,11 +49,11 @@
                 <!-- Featured Image -->
                 <div class="relative overflow-hidden bg-gray-100 aspect-video">
                     <img
-                        *ngIf="blog.post.featured_image; else placeholderTemplate"
-                        [lazyLoad]="getImageUrl(blog.post.featured_image.filename)"
+                        *ngIf="blog.featured_image; else placeholderTemplate"
+                        [lazyLoad]="getImageUrl(blog.featured_image.filename)"
                         [defaultImage]="placeholderImage"
                         [errorImage]="placeholderImage"
-                        [alt]="blog.post.featured_image.alt_text || blog.post.title"
+                        [alt]="blog.featured_image.alt_text || blog.title"
                         class="w-full h-full object-cover">
                     <ng-template #placeholderTemplate>
                         <div class="w-full h-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
@@ -66,7 +63,7 @@
 
                     <!-- Reading Time Badge -->
                     <div class="absolute top-4 right-4 bg-card bg-opacity-90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-on-surface">
-                        {{ calculateReadingTime(blog.post.content) }} min read
+                        {{ calculateReadingTime(blog.content) }} min read
                     </div>
                 </div>
 
@@ -75,29 +72,29 @@
                     <!-- Article Header -->
                     <header class="mb-8">
                         <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight mb-6 text-on-surface">
-                            {{ blog.post.title }}
+                            {{ blog.title }}
                         </h1>
 
                         <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-secondary mb-6">
                             <div class="flex items-center gap-2">
                                 <mat-icon class="text-hint" style="font-size: 16px; height: 16px; width: 16px;">schedule</mat-icon>
-                                <time [attr.datetime]="blog.post.published_at">
-                                    {{ formatDate(blog.post.published_at) }}
+                                <time [attr.datetime]="blog.published_at">
+                                    {{ formatDate(blog.published_at) }}
                                 </time>
                             </div>
                             <span class="w-1 h-1 bg-gray-400 rounded-full"></span>
-                            <span>{{ calculateReadingTime(blog.post.content) }} min read</span>
+                            <span>{{ calculateReadingTime(blog.content) }} min read</span>
                         </div>
 
                         <!-- Excerpt -->
-                        <p *ngIf="blog.post.excerpt" class="text-lg text-secondary leading-relaxed mb-8">
-                            {{ blog.post.excerpt }}
+                        <p *ngIf="blog.excerpt" class="text-lg text-secondary leading-relaxed mb-8">
+                            {{ blog.excerpt }}
                         </p>
                     </header>
 
                     <!-- Article Body -->
                     <article class="prose prose-lg max-w-none dark:prose-invert prose-headings:break-words prose-p:break-words">
-                        <div class="whitespace-pre-wrap leading-relaxed" [innerHTML]="blog.post.content"></div>
+                        <div class="whitespace-pre-wrap leading-relaxed" [innerHTML]="blog.content"></div>
                     </article>
                 </div>
             </div>

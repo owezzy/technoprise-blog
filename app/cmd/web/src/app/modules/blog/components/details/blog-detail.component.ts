@@ -1,7 +1,6 @@
 import { Component, ViewEncapsulation, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { FuseAlertComponent } from '@fuse/components/alert';
@@ -14,7 +13,6 @@ import { LazyLoadImageModule } from 'ng-lazyload-image';
     standalone   : true,
     imports: [
         CommonModule,
-        MatProgressSpinnerModule,
         MatButtonModule,
         MatIconModule,
         FuseAlertComponent,

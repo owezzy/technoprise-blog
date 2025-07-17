@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ViewEncapsulation, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -6,12 +6,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Subject, takeUntil } from 'rxjs';
 import { BlogPost } from '../../models';
 import { DeleteImageDialogComponent } from '../delete-image-dialog.component';
 import { FuseAlertComponent } from "../../../../../@fuse/components/alert";
+import { FuseLoadingService } from '@fuse/services/loading';
 import { environment } from "../../../../../environments/environment";
 import { LazyLoadImageModule } from 'ng-lazyload-image';
 
@@ -27,7 +27,6 @@ import { LazyLoadImageModule } from 'ng-lazyload-image';
         MatInputModule,
         MatButtonModule,
         MatIconModule,
-        MatProgressSpinnerModule,
         MatDialogModule,
         FuseAlertComponent,
         LazyLoadImageModule
@@ -37,11 +36,12 @@ import { LazyLoadImageModule } from 'ng-lazyload-image';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
-  @Input() blog: { post: BlogPost } | null = null;
+  @Input() blog: BlogPost | null = null;
   @Input() loading: boolean = false;
   @Input() saving: boolean = false;
   @Input() error: string | null = null;
   @Input() uploadingImage: boolean = false;
+  @Input() deletingImage: boolean = false;
   @Input() imageUploadError: string | null = null;
   @Input() isEditMode: boolean = false;
 
@@ -61,6 +61,7 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
   readonly placeholderImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMzMgMTYwSDI2M1YxNDBIMTMzVjE2MFoiIGZpbGw9IiNEMUQ1REIiLz4KPHBhdGggZD0iTTEzMyAxODBIMjEzVjE2MEgxMzNWMTgwWiIgZmlsbD0iI0QxRDVEQiIvPgo8cGF0aCBkPSJNMTcwIDEyMEMyMTMuMDc2IDEyMCAyNzAgMTA5LjA3NiAyNzAgMTA5LjA3NkwyNzAgMTA5LjA3NkMxOTIuMDc2IDEyMCAxNzAgMTIwIDE3MCAxMjBaIiBmaWxsPSIjRDFENURCIi8+CjxwYXRoIGQ9Ik0xNzAgMTIwQzEzMy4wNzYgMTIwIDg3IDEwOS4wNzYgODcgMTA5LjA3Nkw4NyAxMDkuMDc2QzE0Ni4wNzYgMTIwIDE3MCAxMjAgMTcwIDEyMFoiIGZpbGw9IiNEMUQ1REIiLz4KPC9zdmc+Cg==';
 
   private _unsubscribeAll: Subject<any> = new Subject<any>();
+  private _fuseLoadingService = inject(FuseLoadingService);
 
   /**
    * Constructor
@@ -102,6 +103,16 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
       }
     }
 
+    // Handle loading states with FuseLoadingBar
+    if (changes['loading'] || changes['saving'] || changes['uploadingImage'] || changes['deletingImage']) {
+      const isLoading = this.loading || this.saving || this.uploadingImage || this.deletingImage;
+      if (isLoading) {
+        this._fuseLoadingService.show();
+      } else {
+        this._fuseLoadingService.hide();
+      }
+    }
+
     // Clear selected image if upload was successful (featured_image was updated)
     if (changes['blog'] && changes['blog'].previousValue && changes['blog'].currentValue) {
       const prevImage = changes['blog'].previousValue?.post?.featured_image;
@@ -119,6 +130,8 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
    * On destroy
    */
   ngOnDestroy(): void {
+    // Ensure loading bar is hidden when component is destroyed
+    this._fuseLoadingService.hide();
     this._unsubscribeAll.next(null);
     this._unsubscribeAll.complete();
   }
@@ -156,15 +169,15 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
   private populateForm(): void {
     if (this.blog) {
       this.editForm.patchValue({
-        title: this.blog.post.title || '',
-        slug: this.blog.post.slug || '',
-        excerpt: this.blog.post.excerpt || '',
-        content: this.blog.post.content || ''
+        title: this.blog.title || '',
+        slug: this.blog.slug || '',
+        excerpt: this.blog.excerpt || '',
+        content: this.blog.content || ''
       });
 
       // Set featured image preview if exists
-      if (this.blog.post.featured_image) {
-        this.featuredImagePreview = this.getImageUrl(this.blog.post.featured_image.filename);
+      if (this.blog.featured_image) {
+        this.featuredImagePreview = this.getImageUrl(this.blog.featured_image.filename);
       } else {
         this.featuredImagePreview = null;
       }
@@ -229,7 +242,7 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
    */
   onDelete(): void {
     if (this.blog) {
-      this.delete.emit(this.blog.post.id);
+      this.delete.emit(this.blog.id);
     }
   }
 
@@ -255,7 +268,7 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
    */
   onUploadImage(): void {
     if (this.selectedImage) {
-      const blogId = this.blog?.post?.id || 0;
+      const blogId = this.blog?.id || 0;
       this.uploadImage.emit({file: this.selectedImage, id: blogId});
     }
   }
@@ -264,15 +277,15 @@ export class BlogEditComponent implements OnInit, OnDestroy, OnChanges {
    * Remove featured image
    */
   onRemoveImage(): void {
-    if (this.blog?.post.featured_image) {
+    if (this.blog?.featured_image) {
       const dialogRef = this.dialog.open(DeleteImageDialogComponent, {
         width: '400px',
-        data: { imageId: this.blog.post.featured_image.id }
+        data: { imageId: this.blog.featured_image.id }
       });
 
       dialogRef.afterClosed().subscribe(result => {
         if (result) {
-          this.deleteImage.emit(this.blog!.post.featured_image!.id);
+          this.deleteImage.emit(this.blog!.featured_image!.id);
         }
       });
     }

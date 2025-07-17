@@ -61,6 +61,14 @@ export class BlogEditEffects {
     )
   );
 
+  // Reload blog after successful save
+  reloadAfterSave$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(BlogEditApiActions.saveBlogSuccess),
+      map(({ blog }) => BlogEditPageActions.loadBlog({ id: blog.id }))
+    )
+  );
+
   // Navigate to edit mode after successful save
   navigateAfterSave$ = createEffect(() =>
     this.actions$.pipe(
@@ -85,6 +93,16 @@ export class BlogEditEffects {
     )
   );
 
+  // Navigate to blog list after successful deletion
+  navigateAfterDelete$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(BlogEditApiActions.deleteBlogSuccess),
+      tap(() => {
+        this.router.navigate(['/blog']);
+      })
+    ), { dispatch: false }
+  );
+
   uploadImage$ = createEffect(() =>
     this.actions$.pipe(
       ofType(BlogEditPageActions.uploadImage),
@@ -104,7 +122,7 @@ export class BlogEditEffects {
     this.actions$.pipe(
       ofType(BlogEditApiActions.uploadImageSuccess),
       withLatestFrom(this.store.select(fromBlog.selectBlogEditBlog)),
-      map(([action, blog]) => {
+      map(([_action, blog]) => {
         if (blog?.id) {
           return BlogEditPageActions.loadBlog({ id: blog.id });
         }
@@ -132,7 +150,7 @@ export class BlogEditEffects {
     this.actions$.pipe(
       ofType(BlogEditApiActions.deleteImageSuccess),
       withLatestFrom(this.store.select(fromBlog.selectBlogEditBlog)),
-      map(([action, blog]) => {
+      map(([_action, blog]) => {
         if (blog?.id) {
           return BlogEditPageActions.loadBlog({ id: blog.id });
         }

@@ -1,12 +1,13 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
-import { Observable } from 'rxjs';
+import { Observable, Subject, takeUntil } from 'rxjs';
 import { BlogDetailComponent } from '../components/details/blog-detail.component';
 import { BlogPost } from '../models';
 import * as fromBlog from '../reducers';
 import { BlogDetailPageActions } from '../actions/blog-detail-page.actions';
+import { FuseLoadingService } from '@fuse/services/loading';
 
 @Component({
   selector: 'blog-detail-container',
@@ -25,6 +26,8 @@ export class BlogDetailContainerComponent implements OnInit, OnDestroy {
   blog$: Observable<BlogPost | null>;
   loading$: Observable<boolean>;
   error$: Observable<string | null>;
+  private destroy$ = new Subject<void>();
+  private _fuseLoadingService = inject(FuseLoadingService);
 
   constructor(
     private store: Store,
@@ -36,6 +39,17 @@ export class BlogDetailContainerComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Subscribe to loading state and control FuseLoadingBar
+    this.loading$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(loading => {
+        if (loading) {
+          this._fuseLoadingService.show();
+        } else {
+          this._fuseLoadingService.hide();
+        }
+      });
+
     const slug = this.route.snapshot.params['slug'];
     if (slug) {
       this.store.dispatch(BlogDetailPageActions.loadBlog({ slug }));
@@ -43,6 +57,10 @@ export class BlogDetailContainerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Ensure loading bar is hidden when component is destroyed
+    this._fuseLoadingService.hide();
+    this.destroy$.next();
+    this.destroy$.complete();
     this.store.dispatch(BlogDetailPageActions.leavePage());
   }
 }

@@ -1,5 +1,5 @@
 import { createActionGroup, props } from '@ngrx/store';
-import { BlogPost } from '../models';
+import { BlogPost, BlogImage } from '../models';
 
 export const BlogEditApiActions = createActionGroup({
   source: 'Blog Edit API',
@@ -12,7 +12,7 @@ export const BlogEditApiActions = createActionGroup({
     'Update Blog Failure': props<{ error: string }>(),
     'Delete Blog Success': props<{ id: number }>(),
     'Delete Blog Failure': props<{ error: string }>(),
-    'Upload Image Success': props<{ image: { id: number; filename: string; file_path: string; alt_text?: string; caption?: string } }>(),
+    'Upload Image Success': props<{ image: BlogImage }>(),
     'Upload Image Failure': props<{ error: string }>(),
     'Delete Image Success': props<{ imageId: number }>(),
     'Delete Image Failure': props<{ error: string }>(),

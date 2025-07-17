@@ -1,13 +1,13 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Observable, map, takeUntil, Subject } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { FuseAlertComponent } from '@fuse/components/alert';
+import { FuseLoadingService } from '@fuse/services/loading';
 import { BlogPost } from '../models';
 import * as fromBlog from '../reducers';
 import { FindBlogPageActions } from '../actions/find-blog-page.actions';
@@ -18,13 +18,11 @@ import { BlogPreviewListComponent } from '../components/blog-preview-list.compon
     standalone: true,
     imports: [
         CommonModule,
-        RouterLink,
         MatButtonModule,
         MatIconModule,
-        MatProgressSpinnerModule,
         MatPaginatorModule,
         FuseAlertComponent,
-        BlogPreviewListComponent
+        BlogPreviewListComponent,
     ],
     templateUrl: './blog.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -44,6 +42,7 @@ export class BlogContainerComponent implements OnInit, OnDestroy {
     currentYear = new Date().getFullYear();
 
     private destroy$ = new Subject<void>();
+    private _fuseLoadingService = inject(FuseLoadingService);
 
     constructor(
         private store: Store,
@@ -70,6 +69,17 @@ export class BlogContainerComponent implements OnInit, OnDestroy {
     }
 
     ngOnInit(): void {
+        // Subscribe to loading state and control FuseLoadingBar
+        this.loading$
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(loading => {
+                if (loading) {
+                    this._fuseLoadingService.show();
+                } else {
+                    this._fuseLoadingService.hide();
+                }
+            });
+
         // Check for URL parameters and load from URL if present
         const queryParams = this.route.snapshot.queryParams;
         const query = queryParams['q'] || '';
@@ -83,10 +93,11 @@ export class BlogContainerComponent implements OnInit, OnDestroy {
             // Initialize with empty search to load all blogs
             this.store.dispatch(FindBlogPageActions.searchBlogs({ query: '', page: 1, pageSize: 9 }));
         }
-
     }
 
     ngOnDestroy(): void {
+        // Ensure loading bar is hidden when component is destroyed
+        this._fuseLoadingService.hide();
         this.destroy$.next();
         this.destroy$.complete();
     }

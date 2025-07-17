@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
@@ -8,6 +8,7 @@ import { BlogPost } from '../models';
 import * as fromBlog from '../reducers';
 import { BlogEditPageActions } from '../actions/blog-edit-page.actions';
 import { FuseAlertComponent } from '@fuse/components/alert';
+import { FuseLoadingService } from '@fuse/services/loading';
 import { MatIconModule } from '@angular/material/icon';
 
 @Component({
@@ -57,6 +58,7 @@ import { MatIconModule } from '@angular/material/icon';
       [saving]="saving$ | async"
       [error]="error$ | async"
       [uploadingImage]="uploadingImage$ | async"
+      [deletingImage]="deletingImage$ | async"
       [imageUploadError]="imageUploadError$ | async"
       [isEditMode]="isEditMode"
       (save)="onSave($event)"
@@ -69,11 +71,12 @@ import { MatIconModule } from '@angular/material/icon';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BlogEditContainerComponent implements OnInit, OnDestroy {
-  blog$: Observable<any | null>;
+  blog$: Observable<BlogPost | null>;
   loading$: Observable<boolean>;
   saving$: Observable<boolean>;
   error$: Observable<string | null>;
   uploadingImage$: Observable<boolean>;
+  deletingImage$: Observable<boolean>;
   imageUploadError$: Observable<string | null>;
   isEditMode: boolean = false;
 
@@ -82,6 +85,7 @@ export class BlogEditContainerComponent implements OnInit, OnDestroy {
   successMessage: string = '';
 
   private destroy$ = new Subject<void>();
+  private _fuseLoadingService = inject(FuseLoadingService);
 
   constructor(
     private store: Store,
@@ -93,6 +97,7 @@ export class BlogEditContainerComponent implements OnInit, OnDestroy {
     this.saving$ = this.store.select(fromBlog.selectBlogEditSaving);
     this.error$ = this.store.select(fromBlog.selectBlogEditError);
     this.uploadingImage$ = this.store.select(fromBlog.selectBlogEditUploadingImage);
+    this.deletingImage$ = this.store.select(fromBlog.selectBlogEditDeletingImage);
     this.imageUploadError$ = this.store.select(fromBlog.selectBlogEditImageUploadError);
   }
 
@@ -105,6 +110,23 @@ export class BlogEditContainerComponent implements OnInit, OnDestroy {
       this.isEditMode = false;
       this.store.dispatch(BlogEditPageActions.createNewBlog());
     }
+
+    // Subscribe to all loading states and control FuseLoadingBar
+    combineLatest([
+      this.loading$,
+      this.saving$,
+      this.uploadingImage$,
+      this.deletingImage$
+    ]).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(([loading, saving, uploadingImage, deletingImage]) => {
+      const isLoading = loading || saving || uploadingImage || deletingImage;
+      if (isLoading) {
+        this._fuseLoadingService.show();
+      } else {
+        this._fuseLoadingService.hide();
+      }
+    });
 
     // Listen to saving and error state changes for success notifications
     combineLatest([
@@ -127,6 +149,8 @@ export class BlogEditContainerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Ensure loading bar is hidden when component is destroyed
+    this._fuseLoadingService.hide();
     this.destroy$.next();
     this.destroy$.complete();
     this.store.dispatch(BlogEditPageActions.leavePage());

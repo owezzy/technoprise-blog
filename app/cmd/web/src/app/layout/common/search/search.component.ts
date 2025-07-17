@@ -76,13 +76,11 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
     // BehaviorSubjects for state management
     private _opened$ = new BehaviorSubject<boolean>(false);
     private _resultSets$ = new BehaviorSubject<any[]>([]);
-    
+
     // Reactive streams for template consumption
     opened$ = this._opened$.asObservable();
     resultSets$ = this._resultSets$.asObservable();
-    isSearchActive$ = this._blogSearchService.isSearchActive$;
-    searchQuery$ = this._blogSearchService.searchQuery$;
-    
+
     searchControl: UntypedFormControl = new UntypedFormControl();
     private _matAutocomplete: MatAutocomplete;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
@@ -163,56 +161,7 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
      * On init
      */
     ngOnInit(): void {
-        // Initialize search control with current query when search becomes active
-        combineLatest([this.isSearchActive$, this.searchQuery$])
-            .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe(([isActive, query]) => {
-                if (isActive && query && query !== this.searchControl.value) {
-                    this.searchControl.setValue(query, { emitEvent: false });
-                } else if (!isActive && this.searchControl.value) {
-                    this.searchControl.setValue('', { emitEvent: false });
-                }
-            });
 
-        // Handle search input changes
-        combineLatest([
-            this.searchControl.valueChanges.pipe(
-                startWith(''),
-                debounceTime(this.debounce)
-            ),
-            this.isSearchActive$
-        ])
-        .pipe(
-            takeUntil(this._unsubscribeAll),
-            map(([value, isActive]) => {
-                // Clear results if value is too short
-                if (!value || value.length < this.minLength) {
-                    this._resultSets$.next([]);
-                    return null;
-                }
-
-                // Update blog search service if active
-                if (isActive) {
-                    this._blogSearchService.setSearchQuery(value);
-                }
-
-                return { value, isActive };
-            }),
-            filter(result => result !== null),
-            switchMap(({ value, isActive }) => {
-                // Only perform global search if blog search is not active
-                if (!isActive) {
-                    return this._httpClient.post('api/common/search', { query: value });
-                }
-                return [];
-            })
-        )
-        .subscribe((resultSets: any) => {
-            if (resultSets) {
-                this._resultSets$.next(resultSets);
-                this.search.next(resultSets);
-            }
-        });
     }
 
     /**
@@ -269,16 +218,9 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
 
         // Clear the search input
         this.searchControl.setValue('');
-        
+
         // Clear search in blog search service if active
         // Use take(1) to get current value without persistent subscription
-        this.isSearchActive$.pipe(
-            take(1)
-        ).subscribe(isActive => {
-            if (isActive) {
-                this._blogSearchService.setSearchQuery('');
-            }
-        });
 
         // Close the search
         this._opened$.next(false);

@@ -1,5 +1,5 @@
 import { createReducer, on } from '@ngrx/store';
-import { BlogPost } from '../models';
+import { BlogPost, BlogImage } from '../models';
 import { BlogEditPageActions } from '../actions/blog-edit-page.actions';
 import { BlogEditApiActions } from '../actions/blog-edit-api.actions';
 
@@ -11,6 +11,7 @@ export interface State {
   saving: boolean;
   error: string | null;
   uploadingImage: boolean;
+  deletingImage: boolean;
   imageUploadError: string | null;
 }
 
@@ -20,6 +21,7 @@ const initialState: State = {
   saving: false,
   error: null,
   uploadingImage: false,
+  deletingImage: false,
   imageUploadError: null,
 };
 
@@ -33,7 +35,7 @@ export const reducer = createReducer(
   })),
   on(BlogEditApiActions.loadBlogSuccess, (state, { blog }) => ({
     ...state,
-    blog,
+    blog: blog as BlogPost,
     loading: false,
     error: null,
   })),
@@ -60,7 +62,7 @@ export const reducer = createReducer(
   })),
   on(BlogEditApiActions.saveBlogSuccess, BlogEditApiActions.updateBlogSuccess, (state, { blog }) => ({
     ...state,
-    blog,
+    blog: blog as BlogPost,
     saving: false,
     error: null,
   })),
@@ -99,7 +101,7 @@ export const reducer = createReducer(
     blog: state.blog ? {
       ...state.blog,
       featured_image: image
-    } : null,
+    } as BlogPost : null,
     uploadingImage: false,
     imageUploadError: null,
   })),
@@ -110,16 +112,23 @@ export const reducer = createReducer(
   })),
 
   // Image delete actions
+  on(BlogEditPageActions.deleteImage, (state) => ({
+    ...state,
+    deletingImage: true,
+    imageUploadError: null,
+  })),
   on(BlogEditApiActions.deleteImageSuccess, (state, { imageId }) => ({
     ...state,
     blog: state.blog ? {
       ...state.blog,
       featured_image: undefined
-    } : null,
+    } as BlogPost : null,
+    deletingImage: false,
     imageUploadError: null,
   })),
   on(BlogEditApiActions.deleteImageFailure, (state, { error }) => ({
     ...state,
+    deletingImage: false,
     imageUploadError: error,
   })),
 
@@ -132,4 +141,5 @@ export const getLoading = (state: State) => state.loading;
 export const getSaving = (state: State) => state.saving;
 export const getError = (state: State) => state.error;
 export const getUploadingImage = (state: State) => state.uploadingImage;
+export const getDeletingImage = (state: State) => state.deletingImage;
 export const getImageUploadError = (state: State) => state.imageUploadError;
